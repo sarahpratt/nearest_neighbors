@@ -1,42 +1,18 @@
 import json
 from collections import defaultdict
 from typing import List, Dict, Callable
-from skimage import io
+
 import matplotlib.pyplot as plt
 import numpy as np
-from skimage.transform import rescale, resize
+from skimage import io
 
-
-def bb_intersection_over_union(boxA, boxB):
-    if boxA[0] < 0:
-        if boxB[0] < 0:
-            return 1
-        else:
-            return 0
-
-    # determine the (x, y)-coordinates of the intersection rectangle
-    xA = max(boxA[0], boxB[0])
-    yA = max(boxA[1], boxB[1])
-    xB = min(boxA[2], boxB[2])
-    yB = min(boxA[3], boxB[3])
-
-    # compute the area of intersection rectangle
-    interArea = abs(max((xB - xA, 0)) * max((yB - yA), 0))
-    if interArea == 0:
-        return 0
-    # compute the area of both the prediction and ground-truth
-    # rectangles
-    boxAArea = abs((boxA[2] - boxA[0]) * (boxA[3] - boxA[1]))
-    boxBArea = abs((boxB[2] - boxB[0]) * (boxB[3] - boxB[1]))
-
-    # compute the intersection over union by taking the intersection
-    # area and dividing it by the sum of prediction + ground-truth
-    # areas - the interesection area
-    iou = interArea / float(boxAArea + boxBArea - interArea)
-
-    # return the intersection over union value
-    return iou
-
+from helpers import (
+    resize_height,
+    resize_width,
+    bb_intersection_over_union,
+    get_query_file_names,
+    get_match_file_names,
+)
 
 if __name__ == "__main__":
     print("Reading predictions csv into dict.")
@@ -78,7 +54,6 @@ if __name__ == "__main__":
             )
 
             if i % 6 == 0:
-                assert words[0]["verb"] == line[0]
                 already_in = False
 
                 img_verb_pair = (line[0], words[0]["verb"])
@@ -165,22 +140,15 @@ def create_verb_conditional_scorer(frame_scorer: Callable):
     return verb_conditional_scorer
 
 
-with open("match_set.csv") as f:
-    all_match_file_names = f.readlines()
-all_match_file_names = [
-    fn for fn in [fn.strip() for fn in all_match_file_names] if fn != ""
-]
+all_match_file_names = get_match_file_names()
+all_query_file_names = get_query_file_names()
 
-with open("query_set.csv") as f:
-    all_query_file_names = f.readlines()
-all_query_file_names = [
-    fn for fn in [fn.strip() for fn in all_query_file_names] if fn != ""
-]
-
-scoring_func = create_verb_conditional_scorer(frame_scorer=noun_conditional_marginal_iou)
+scoring_func = create_verb_conditional_scorer(
+    frame_scorer=noun_conditional_marginal_iou
+)
 # scoring_func = create_verb_conditional_scorer(frame_scorer=noun_conditional_ignore_iou)
 query_fn_to_top_five_matches = {}
-max_to_find = 20
+max_to_find = 2000
 for i, query_file_name in enumerate(all_query_file_names):
     print(i, query_file_name)
     top_list_for_query = []
@@ -202,25 +170,18 @@ for i, query_file_name in enumerate(all_query_file_names):
     if len(query_fn_to_top_five_matches) == max_to_find:
         break
 
+# with open("swig_query_to_best_dist_match_pairs.json", "w") as f:
+#     json.dump(query_fn_to_top_five_matches, f)
+
+# with open("imsitu_query_to_best_dist_match_pairs.json", "w") as f:
+#     json.dump(query_fn_to_top_five_matches, f)
+
+
 best_score_query_fn_list = [
     (matches[0][0], qfn) for qfn, matches in query_fn_to_top_five_matches.items()
 ]
 best_score_query_fn_list.sort(reverse=True)
 sorted_query_file_names = [x[1] for x in best_score_query_fn_list]
-
-
-def resize_height(im, new_height):
-    height, width, _ = im.shape
-    scale = new_height / height
-
-    return resize(im, (round(height * scale), round(width * scale)), anti_aliasing=True)
-
-
-def resize_width(im, new_width):
-    height, width, _ = im.shape
-    scale = new_width / width
-
-    return resize(im, (round(height * scale), round(width * scale)), anti_aliasing=True)
 
 
 # for query_file_name, matches in query_fn_to_top_five_matches.items():

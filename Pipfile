@@ -12,6 +12,9 @@ scipy = "*"
 sklearn = "*"
 pandas = "*"
 scikit-image = "*"
+torch = "*"
+torchvision = "*"
+ipython = "*"
 
 [requires]
 python_version = "3.6"
